@@ -1,0 +1,93 @@
+---
+title: "Course Project"
+output:
+  html_document: default
+---
+
+## Model Building
+
+### Data and Features
+
+The goal of this project is to predict correctly the "classe" variable with 5 levels 
+for test data set consisting of 20 records
+collected from sensors during the exercises, and stored in pml-testing.csv file.
+
+The training data set is stored in file pml-training.csv. This data set has 19622 observations
+in 160 columns including the "classe" column.
+
+```{r}
+pml.training <- read.csv("pml-training.csv")
+
+library(caret)
+dim(pml.training)
+```
+
+After examining the test data set with 20 records, I noticed that several columns are either empty or 
+data is missing (NA). I decided to exclude these columns from the model because they would not
+be useful to prediction. I also removed the observation number and timestamp columns.
+
+I had reservations about removing the "user_name"" column because it potentially could be useful
+in case a particular person has a pattern of wrong and right movement. However, eventually I decided to remove this column too hoping that the model would predict the outcome regardless of the user_name because they were all 
+instructed to make the same movements. The resulting choices are reflected in the pattern below.
+
+```{r}
+nm = names(pml.training)
+patnames = "user_name|X|cvtd_timestamp|((kurtosis|skewness|max_|min_|amplitude|avg_|stddev_|var_).*)"
+gnm = grep(patnames,nm,value=TRUE,invert=TRUE)
+```
+
+Next, I applied this pattern to remove all the excluded columns, and created the training (70%) and 
+cross-validation (30%)
+sets from the training data set as follows:
+
+```{r}
+inTrain = createDataPartition(y=pml.training$classe,p=0.7, list=FALSE)
+
+training = pml.training[inTrain,gnm]
+cvtesting = pml.training[-inTrain,gnm]
+```
+
+I will use the testing data set for the final validation.
+
+## Algorithm
+
+I decided to start with random forest algorithm and uset he "caret" package to apply it.
+This algorithm is known to work for well in similar problems on Kaggle, and seemed like a logical
+choice for the first candidate model.
+
+```{r,eval=FALSE}
+fitRF = train(classe~.,data=training,method="rf",prox=TRUE)
+```
+
+The algorithm ran for several hours, but finished successfully:
+
+```{r,eval=FALSE}
+fitRF
+```
+
+## Cross-validation
+In order to evaluate the accuracy of the model I predicted the "classe" variable on the cross-validation
+data set, then built the confusion matrix as follows:
+```{r,eval=FALSE}
+pred=predict(fitRF,cvtesting)
+confusionMatrix(cvtesting$classe,pred)
+```
+
+To my great surprise the confusion matrix was spectacular: 
+the accuracy was 0.9998 with confidence interval of (0.9991,1). The kappa statistic
+which compares observed and expected accuracies was 0.9998.
+
+I estimated less than 1% probability of an error in the test sample with 20 test cases: $1-0.9998^20<0.004$.
+With these results my model must correcly predict all 20 test cases almost surely. Therefore, I considered
+my goal accomplished.
+
+## Validation/Testing
+
+My last setp was to predict the "classe" for 20 test cases. I submitted my answers and got all 20
+answers correct on the code assignment page.
+```{r,eval=FALSE}
+pml.testing <- read.csv("pml-testing.csv")
+pred20=predict(fitRF,pml.testing)
+```
+
+The End.
